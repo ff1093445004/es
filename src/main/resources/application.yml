@@ -1,0 +1,18 @@
+server:
+  port: 8888
+
+spring:
+  data:
+    elasticsearch:
+      clusterName: elasticsearch
+      clusterNodes: 127.0.0.1:9300
+  redis:
+    database: 0
+    host: 127.0.0.1
+    port: 6379
+    password:
+
+logging:
+  config: 
+    classpath: log/logback-spring.xml
+  path: C:\Users\zhm\Desktop\log
