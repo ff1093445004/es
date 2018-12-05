@@ -60,6 +60,7 @@ public class ProductService {
 
 	public List<Product> findByNameHighLight(String name) {
         QueryBuilder matchQuery;
+        //das
         if (StringUtils.isEmpty(name)) {
             matchQuery = QueryBuilders.matchAllQuery();
         } else {
