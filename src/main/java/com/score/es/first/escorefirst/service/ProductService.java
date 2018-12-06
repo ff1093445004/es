@@ -1,10 +1,8 @@
 package com.score.es.first.escorefirst.service;
 
-import com.google.common.collect.Lists;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.score.es.first.escorefirst.model.Product;
-import com.score.es.first.escorefirst.repository.ProductRepository;
+import java.util.List;
+import java.util.Map;
+
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.text.Text;
@@ -19,10 +17,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import com.google.common.collect.Lists;
+import com.google.gson.Gson;
+import com.score.es.first.escorefirst.model.BaseResult;
+import com.score.es.first.escorefirst.model.Product;
+import com.score.es.first.escorefirst.repository.ProductRepository;
 
 @Service
 public class ProductService {
@@ -58,41 +57,44 @@ public class ProductService {
 		productRepository.delete(product);
 	}
 
-	public List<Product> findByNameHighLight(String name) {
-        QueryBuilder matchQuery;
-        //das
-        if (StringUtils.isEmpty(name)) {
-            matchQuery = QueryBuilders.matchAllQuery();
-        } else {
-            // 构造查询条件,使用IK分词器
-            matchQuery = QueryBuilders.matchQuery("name", name).analyzer("ik_max_word").operator(Operator.OR);
+	public BaseResult findByNameHighLight(int page, int size, String name) {
+		BaseResult bs = new BaseResult();
+		QueryBuilder matchQuery;
+		if (StringUtils.isEmpty(name)) {
+			matchQuery = QueryBuilders.matchAllQuery();
+		} else {
+			// 构造查询条件,使用IK分词器
+			matchQuery = QueryBuilders.matchQuery("name", name).analyzer("ik_max_word").operator(Operator.OR);
 		}
 		// 设置高亮,使用默认的highlighter高亮器
 		HighlightBuilder highlightBuilder = new HighlightBuilder().field("name")
 				.preTags("<span style=\"color:red;font-weight:bold;\">").postTags("</span>");
 		// 设置查询字段 设置一次返回的文档数量
 		SearchResponse response = transportClient.prepareSearch("product_index").setTypes("product")
-				.setQuery(matchQuery).highlighter(highlightBuilder).setSize(20).get();
-        // 获取命中次数，查询结果有多少对象
+				.setQuery(matchQuery).highlighter(highlightBuilder).setFrom((page - 1) * size).setSize(size).get();
+		// 获取命中次数，查询结果有多少对象
 		SearchHits hits = response.getHits();
-		System.out.println("查询结果有：" + hits.getTotalHits() + "条");
 		List<Product> list = Lists.newArrayList();
+		bs.setTotal(hits.getTotalHits());
+		bs.setList(list);
 		for (SearchHit searchHit : hits) {
-			// 将高亮处理后的内容，替换原有内容（原有内容，可能会出现显示不全）
-			Map<String, HighlightField> highlightFields = searchHit.getHighlightFields();
-			// 获取到原有内容中 每个高亮显示 集中位置fragment就是高亮片段
-			HighlightField titleField = highlightFields.get("name");
-			Text[] fragments = titleField.fragments();
-			StringBuilder names = new StringBuilder();
-			for (Text text : fragments) {
-				names.append(text);
-			}
 			// 将查询结果转换为对象
 			Product product = GSON.fromJson(searchHit.getSourceAsString(), Product.class);
-			// 用高亮后的内容，替换原有内容
-			product.setName(names.toString());
 			list.add(product);
+			if (!StringUtils.isEmpty(name)) {
+				// 将高亮处理后的内容，替换原有内容（原有内容，可能会出现显示不全）
+				Map<String, HighlightField> highlightFields = searchHit.getHighlightFields();
+				// 获取到原有内容中 每个高亮显示 集中位置fragment就是高亮片段
+				HighlightField titleField = highlightFields.get("name");
+				Text[] fragments = titleField.fragments();
+				StringBuilder names = new StringBuilder();
+				for (Text text : fragments) {
+					names.append(text);
+				}
+				// 用高亮后的内容，替换原有内容
+				product.setName(names.toString());
+			}
 		}
-		return list;
+		return bs;
 	}
 }
